@@ -3,14 +3,17 @@ namespace App\Http\Middleware;
 
 use RootInc\LaravelAzureMiddleware\Azure as Azure;
 use Closure;
+use Microsoft\Graph\Graph;
+use Microsoft\Graph\Model;
 
 use Illuminate\Http\Request;
 
+use Illuminate\Support\Facades\Redirect;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 
 use Auth;
-
+use App\Models\User;
 class AppAzure extends Azure
 {
     protected $login_route = "/login";
@@ -136,6 +139,8 @@ class AppAzure extends Azure
         $client = new Client();
 
         $code = $request->input('code');
+   
+        
         try {
             $response = $client->request('POST',  'https://login.microsoftonline.com/' . 'e4a5a83a-cf4d-4d94-90ce-dd3edd74d066'. '/oauth2/' .  "token", [
                 'form_params' => [
@@ -162,6 +167,23 @@ class AppAzure extends Azure
         return $this->success($request, $access_token, $refresh_token, $profile);
     }
 
+    public function getinfo(Request $request)
+    {
+       /*  $token = session('token'); */
+       $token = $request->token;
+        $graph = new Graph();
+        $graph->setAccessToken($token);
+        
+        $graph_user = $graph->createRequest("GET", "/me")
+                      ->setReturnType(Model\User::class)
+                      ->execute();
+
+        $email = strtolower($graph_user->getMail());
+
+       
+        return  response()->json(['email' => $email]);
+    }
+
     /**
      * Handler that is called when a successful login has taken place for the first time
      *
@@ -173,7 +195,85 @@ class AppAzure extends Azure
      */
     protected function success(Request $request, $access_token, $refresh_token, $profile)
     {
-        return redirect()->intended("/home");
+        $graph = new Graph();
+        $graph->setAccessToken($access_token);
+        
+        $graph_user = $graph->createRequest("GET", "/me")
+                      ->setReturnType(Model\User::class)
+                      ->execute();
+
+       /*  $userinfo1 = [
+            "accountEnabled" => true,
+            "displayName" => "Jerwin Fernandez",
+            "mailNickname" => "jerwinfernandez",
+            "userPrincipalName" => "antitmaliit@franzfernandez163gmail.onmicrosoft.com",
+            "mail" => "antitmaliit@gmail.com",
+            "userType"=>"Member",
+            "passwordProfile"  => [
+              "forceChangePasswordNextSignIn" => false,
+              "password" =>"W1ar3pr0"
+            ]
+        ];
+        $graph_user = $graph->createRequest("POST", "/invitations")
+                      ->attachBody([
+                        "invitedUserDisplayName" => "Hi antit!",
+                        "invitedUserEmailAddress"=> "antitmaliit@gmail.com",
+                        "inviteRedirectUrl"=> "https://myapps.microsoft.com/",
+                        "sendInvitationMessage"=> true,
+                        "customizedMessageBody"=> "Hello Sam, let's collaborate!",
+                        "invitedUserType"=> "Member"
+                      ])
+                      ->execute(); */
+
+        /* $invite_user = $graph->createRequest("POST", "/invitations")
+                      ->attachBody([
+                        "invitedUserEmailAddress"=> "antitmaliit@gmail.com",
+                        "inviteRedirectUrl" "https://www.google.com"
+                      ])
+                      ->execute(); */
+        /* $email = strtolower($graph_user->getUserPrincipalName());
+
+        $data = $request->all();
+
+        $username['email'] = User::select('email')
+        ->where('email', "=", $data['email'])
+        ->get();
+
+        if(count($username['email']) != 0){
+            return response()->json(['message' => 'email is already exist.']);
+        }
+        else{
+            $data["password"] = bcrypt($data['password']);
+            $new_user = User::create($data);
+            if($new_user){
+                $msg =  ["msg"=> "success"];
+                return $msg;
+            }
+            else{
+                $msg =  ["msg"=> "failed"];
+                return $msg;
+            }
+        }
+        */
+        $email = strtolower($graph_user->getMail());
+        session(['token' => $access_token]);
+        $user = User::updateOrCreate(['email' => $email], [
+            'first_name' => $graph_user->GetDisplayName(),
+            'password' => 'w1ar3pr0',
+            'last_edit_user_id' => 'w1ar3pr0',
+            'is_active' => '1',
+            'last_name' => 'w1ar3pr0',
+            'middle_name' => 'w1ar3pr0',
+            'phone' => '12312321321',
+            'user_type' => 'Admin',
+        ]);
+
+        // Retrieve a User Information using Email
+        $user = User::where('email', $email)->first();
+        return redirect()->away('http://localhost:4200?token='. $access_token);
+
+        /* Auth::login($user, true);  */
+       /*  return redirect()->intended("/home"); */
     }
 
     /**
@@ -181,7 +281,7 @@ class AppAzure extends Azure
      *
      * @param \Illuminate\Http\Request $request
      * @param \Exception $e
-     * @return string
+     * @return string   
      */
     protected function fail(Request $request, \Exception $e)
     {

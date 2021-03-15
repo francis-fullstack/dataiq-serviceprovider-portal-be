@@ -12,14 +12,17 @@ use Illuminate\Support\Facades\Route;
 | contains the "web" middleware group. Now create something great!
 |
 */
-
 Route::get('/', function () {
     return view('welcome');
 });
 
+
+
 Route::get('/login/azure', '\App\Http\Middleware\AppAzure@azure');
 Route::get('/login/azurecallback', '\App\Http\Middleware\AppAzure@azurecallback');
 Route::get('/logout/azure', '\App\Http\Middleware\AppAzure@azurelogout');
+
 Route::get('/home', function () {
-    return view('home');
-})->name('home');
+    return view('home')->name('home');
+});
+Route::get('/getinfo', '\App\Http\Middleware\AppAzure@getinfo');
